@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HQRUCHYO OCR (manga)</title>
+    <!-- Memuat Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Library JSZip untuk membaca file .zip -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Tema Biru Laut Dalam & Biru Navy Soft */
+            --bg-deep: #050b14;
+            --bg-mid: #0a192f;
+            --bg-light: #112240;
+            --bg-accent: #233554;
+            --text-main: #e6f1ff;
+            --text-muted: #8892b0;
+            --accent-blue: #8ab4f8; /* Soft navy accent */
+            --glass-bg: rgba(10, 25, 47, 0.6);
+            --glass-border: rgba(138, 180, 248, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-deep), var(--bg-mid), var(--bg-light));
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        .heading-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-deep); }
+        ::-webkit-scrollbar-thumb { background: var(--bg-accent); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
+
+        .ocean-container {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        /* Buih Air */
+        .bubble {
+            position: absolute;
+            bottom: -100px;
+            background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.05) 60%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.2), 0 0 15px rgba(138, 180, 248, 0.2);
+            animation: rise linear infinite;
+        }
+
+        @keyframes rise {
+            0% { transform: translateY(0) scale(1) translateX(0); opacity: 0; }
+            20% { opacity: 0.8; }
+            50% { transform: translateY(-50vh) scale(1.1) translateX(20px); opacity: 0.6; }
+            80% { opacity: 0.3; }
+            100% { transform: translateY(-120vh) scale(1.3) translateX(-20px); opacity: 0; }
+        }
+
+        /* Ubur-ubur Animasi */
+        .jellyfish {
+            position: absolute;
+            bottom: -150px;
+            animation: jellyRise linear infinite;
+        }
+        
+        .jellyfish svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 0 10px rgba(138, 180, 248, 0.4));
+            animation: jellyBob 3s ease-in-out infinite alternate;
+        }
+
+        .tentacle {
+            animation: sway 2s ease-in-out infinite alternate;
+            transform-origin: top;
+        }
+        .tentacle.delay-1 { animation-delay: 0.3s; }
+        .tentacle.delay-2 { animation-delay: 0.6s; }
+
+        @keyframes jellyRise {
+            0% { transform: translateY(0) translateX(0) scale(1) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.8; }
+            50% { transform: translateY(-60vh) translateX(30px) scale(1.1) rotate(5deg); opacity: 0.7; }
+            90% { opacity: 0.5; }
+            100% { transform: translateY(-130vh) translateX(-20px) scale(0.9) rotate(-5deg); opacity: 0; }
+        }
+
+        @keyframes jellyBob {
+            0% { transform: translateY(0) scaleY(1); }
+            100% { transform: translateY(-15px) scaleY(0.95); }
+        }
+
+        @keyframes sway {
+            0% { transform: rotate(-10deg); }
+            100% { transform: rotate(10deg); }
+        }
+
+        /* Dasar Laut & Terumbu Karang */
+        .seabed {
+            position: fixed;
+            bottom: -5px;
+            left: 0;
+            width: 100%;
+            height: 120px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .coral {
+            position: absolute;
+            bottom: 0;
+            height: 100%;
+        }
+        .coral-left { left: -5%; width: 60%; }
+        .coral-right { right: -5%; width: 50%; transform: scaleX(-1); }
+
+        /* Ikan Kecil Animasi */
+        .fish {
+            position: absolute;
+            animation: swimFish linear infinite;
+        }
+        .fish svg { width: 100%; height: 100%; }
+        
+        .fish1 { bottom: 80px; width: 45px; height: 25px; animation-duration: 25s; animation-delay: 0s; }
+        .fish2 { bottom: 40px; width: 30px; height: 15px; animation-duration: 18s; animation-delay: -7s; }
+        .fish3 { bottom: 100px; width: 35px; height: 20px; animation-duration: 32s; animation-delay: -15s; }
+
+        @keyframes swimFish {
+            0% { transform: translateX(-15vw) scaleX(1); }
+            49.9% { transform: translateX(115vw) scaleX(1); }
+            50% { transform: translateX(115vw) scaleX(-1); }
+            99.9% { transform: translateX(-15vw) scaleX(-1); }
+            100% { transform: translateX(-15vw) scaleX(1); }
+        }
+
+        /* Instances */
+        .b1 { left: 10%; width: 20px; height: 20px; animation-duration: 8s; animation-delay: 0s; }
+        .b2 { left: 25%; width: 40px; height: 40px; animation-duration: 12s; animation-delay: 2s; }
+        .b3 { left: 40%; width: 15px; height: 15px; animation-duration: 6s; animation-delay: 1s; }
+        .b4 { left: 55%; width: 30px; height: 30px; animation-duration: 10s; animation-delay: 4s; }
+        .b5 { left: 70%; width: 25px; height: 25px; animation-duration: 9s; animation-delay: 3s; }
+        
+        .j1 { left: 15%; width: 60px; height: 80px; animation-duration: 25s; animation-delay: 2s; }
+        .j2 { left: 65%; width: 80px; height: 100px; animation-duration: 35s; animation-delay: 12s; }
+        .j3 { left: 85%; width: 45px; height: 60px; animation-duration: 20s; animation-delay: 7s; }
+
+        /* Loader */
+        .loader {
+            border: 3px solid rgba(138, 180, 248, 0.2);
+            border-top: 3px solid var(--accent-blue);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Input specific styles */
+        .cyber-input {
+            background: rgba(2, 12, 27, 0.7);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            transition: all 0.3s ease;
+        }
+        .cyber-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 10px rgba(138, 180, 248, 0.3);
+        }
+
+        .tab-btn {
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+        .tab-btn.active {
+            color: var(--accent-blue);
+            border-bottom: 2px solid var(--accent-blue);
+            background: rgba(138, 180, 248, 0.1);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center">
+
+    <div class="ocean-container">
+        <!-- Buih Air -->
+        <div class="bubble b1"></div><div class="bubble b2"></div>
+        <div class="bubble b3"></div><div class="bubble b4"></div>
+        <div class="bubble b5"></div>
+        
+        <!-- Ubur-ubur 1 -->
+        <div class="jellyfish j1">
+            <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 20 60 C 20 20 80 20 80 60 Q 80 65 75 65 Q 70 65 70 60 Q 65 55 60 60 Q 55 65 50 60 Q 45 55 40 60 Q 35 65 30 60 Q 25 55 20 60 Z" fill="rgba(138, 180, 248,0.2)" stroke="rgba(138, 180, 248,0.6)" stroke-width="2"/>
+                <path d="M 30 65 Q 35 90 25 115" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" class="tentacle" />
+                <path d="M 50 65 Q 55 95 45 120" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" class="tentacle delay-1" />
+                <path d="M 70 65 Q 65 90 75 115" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" class="tentacle delay-2" />
+            </svg>
+        </div>
+        
+        <!-- Ubur-ubur 2 -->
+        <div class="jellyfish j2">
+            <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 20 60 C 20 20 80 20 80 60 Q 80 65 75 65 Q 70 65 70 60 Q 65 55 60 60 Q 55 65 50 60 Q 45 55 40 60 Q 35 65 30 60 Q 25 55 20 60 Z" fill="rgba(138, 180, 248,0.15)" stroke="rgba(138, 180, 248,0.4)" stroke-width="2"/>
+                <path d="M 35 65 Q 40 90 30 110" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" class="tentacle delay-2" />
+                <path d="M 65 65 Q 60 90 70 110" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" class="tentacle" />
+            </svg>
+        </div>
+        
+        <!-- Dasar Laut, Terumbu Karang, dan Ikan -->
+        <div class="seabed">
+            <!-- Ikan 1 -->
+            <div class="fish fish1">
+                <svg viewBox="0 0 100 50">
+                    <ellipse cx="50" cy="25" rx="30" ry="15" fill="rgba(138, 180, 248, 0.4)"/>
+                    <polygon points="25,25 5,10 5,40" fill="rgba(138, 180, 248, 0.4)"/>
+                    <polygon points="50,10 65,0 60,15" fill="rgba(138, 180, 248, 0.2)"/>
+                </svg>
+            </div>
+            <!-- Ikan 2 -->
+            <div class="fish fish2">
+                <svg viewBox="0 0 100 50">
+                    <ellipse cx="50" cy="25" rx="30" ry="15" fill="rgba(138, 180, 248, 0.5)"/>
+                    <polygon points="25,25 5,10 5,40" fill="rgba(138, 180, 248, 0.5)"/>
+                    <polygon points="50,40 65,50 60,35" fill="rgba(138, 180, 248, 0.3)"/>
+                </svg>
+            </div>
+            <!-- Ikan 3 -->
+            <div class="fish fish3">
+                <svg viewBox="0 0 100 50">
+                    <ellipse cx="50" cy="25" rx="30" ry="15" fill="rgba(138, 180, 248, 0.3)"/>
+                    <polygon points="25,25 5,10 5,40" fill="rgba(138, 180, 248, 0.3)"/>
+                    <polygon points="50,10 65,0 60,15" fill="rgba(138, 180, 248, 0.2)"/>
+                </svg>
+            </div>
+
+            <!-- Terumbu Karang Static -->
+            <svg class="coral coral-left" viewBox="0 0 200 100" preserveAspectRatio="none">
+                <path d="M10,100 Q15,40 25,60 Q35,10 45,50 Q60,20 70,60 Q85,10 95,50 Q110,30 120,70 Q135,15 145,65 Q160,40 170,80 Q185,20 195,90 L200,100 Z" fill="#071324" opacity="0.8"/>
+            </svg>
+            <svg class="coral coral-right" viewBox="0 0 200 100" preserveAspectRatio="none">
+                 <path d="M0,100 Q15,30 30,70 Q45,20 60,60 Q75,10 90,55 Q105,25 120,65 Q140,15 155,75 Q175,20 190,80 L200,100 Z" fill="#09182e" opacity="0.9"/>
+            </svg>
+        </div>
+    </div>
+
+    <header class="text-center mb-10 mt-6 w-full max-w-4xl">
+        <h1 class="heading-font text-4xl md:text-5xl font-bold mb-3 tracking-wider text-[#e6f1ff]" style="text-shadow: 0 0 20px rgba(138, 180, 248, 0.4);">
+            HQRUCHYO OCR <span class="text-[#8ab4f8] font-light text-2xl md:text-3xl">(manga)</span>
+        </h1>
+        <p class="text-[#8892b0] text-sm md:text-base font-light tracking-wide">
+            sebuah web ocr manga otomatis (kanan ke kiri) by haeilnox on tele ✿
+        </p>
+    </header>
+
+    <main class="w-full max-w-4xl grid grid-cols-1 gap-6">
+
+        <section class="glass-panel rounded-xl p-6 w-full flex flex-col md:flex-row flex-wrap gap-4 items-end">
+            <div class="w-full md:w-40">
+                <label for="providerSelect" class="block text-sm text-[#8892b0] mb-2 font-semibold">Penyedia API ✿</label>
+                <select id="providerSelect" class="cyber-input w-full px-4 py-2 rounded-lg text-sm appearance-none outline-none">
+                    <option value="gemini" class="bg-[#0a192f] text-white">Google Gemini</option>
+                    <option value="sumopod" class="bg-[#0a192f] text-white">Sumopod API</option>
+                </select>
+            </div>
+            <div class="flex-1 w-full md:w-auto min-w-[200px]">
+                <label for="apiKeyInput" id="apiKeyLabel" class="block text-sm text-[#8892b0] mb-2 font-semibold">Gemini API Key ⚡</label>
+                <div class="relative flex items-center">
+                    <input type="password" id="apiKeyInput" placeholder="Masukkan API Key (AIzaSy...)" 
+                        class="cyber-input w-full px-4 py-2 pr-10 rounded-lg text-sm placeholder-[#233554]">
+                    <button type="button" id="toggleKeyBtn" class="absolute right-3 text-[#8ab4f8] hover:text-white text-xs font-semibold">
+                        [👁]
+                    </button>
+                </div>
+            </div>
+            <div class="w-full md:w-36">
+                <label for="modelSelect" class="block text-sm text-[#8892b0] mb-2 font-semibold">Model AI ✿</label>
+                <select id="modelSelect" class="cyber-input w-full px-4 py-2 rounded-lg text-sm appearance-none outline-none">
+                    <option value="gemini-2.5-flash" class="bg-[#0a192f] text-white">Gemini 2.5</option>
+                    <option value="gemini-3-flash-preview" class="bg-[#0a192f] text-white">Gemini 3</option>
+                </select>
+            </div>
+            <div class="w-full md:w-40">
+                <label for="filterMode" class="block text-sm text-[#8892b0] mb-2 font-semibold">Filter Konten ✿</label>
+                <select id="filterMode" class="cyber-input w-full px-4 py-2 rounded-lg text-sm appearance-none outline-none">
+                    <option value="normal" class="bg-[#0a192f] text-white">Normal</option>
+                    <option value="dewasa" class="bg-[#0a192f] text-white">Dewasa (NSFW)</option>
+                </select>
+            </div>
+            <div class="w-full md:w-48">
+                <label for="languageSelect" class="block text-sm text-[#8892b0] mb-2 font-semibold">Bahasa Output ✿</label>
+                <select id="languageSelect" class="cyber-input w-full px-4 py-2 rounded-lg text-sm appearance-none outline-none">
+                    <option value="original" class="bg-[#0a192f] text-white">Asli (Sesuai Gambar)</option>
+                    <option value="english" class="bg-[#0a192f] text-white">Terjemahan Inggris</option>
+                    <option value="indo" class="bg-[#0a192f] text-white">Indonesia (Baku + Aku/Kau)</option>
+                </select>
+            </div>
+            <button id="saveKeyBtn" class="bg-gradient-to-r from-[#233554] to-[#112240] border border-[#8ab4f8]/30 hover:border-[#8ab4f8] text-[#8ab4f8] px-6 py-2 rounded-lg text-sm font-semibold transition-all shadow-[0_0_10px_rgba(138,180,248,0.2)] whitespace-nowrap w-full md:w-auto">
+                Simpan
+            </button>
+        </section>
+
+        <section class="glass-panel rounded-xl p-0 w-full overflow-hidden flex flex-col">
+            
+            <!-- Tabs -->
+            <div class="flex border-b border-[rgba(138,180,248,0.15)] bg-[rgba(2,12,27,0.4)]">
+                <button id="tabSingle" class="tab-btn active text-[#8ab4f8] flex-1 py-4 text-center font-medium text-sm md:text-base">
+                    Single
+                </button>
+                <button id="tabBulk" class="tab-btn text-[#8892b0] flex-1 py-4 text-center font-medium text-sm md:text-base">
+                    Bulk
+                </button>
+                <button id="tabZip" class="tab-btn text-[#8892b0] flex-1 py-4 text-center font-medium text-sm md:text-base">
+                    ZIP
+                </button>
+            </div>
+
+            <div class="p-6">
+                <!-- Upload Area -->
+                <div class="mb-6">
+                    <label class="block w-full cursor-pointer">
+                        <div class="cyber-input border-dashed border-2 rounded-xl p-8 text-center hover:bg-[rgba(138,180,248,0.05)] transition-colors">
+                            <div class="text-3xl mb-3 text-[#8ab4f8]">⇪</div>
+                            <p class="text-[#e6f1ff] font-medium mb-1" id="uploadLabel">Klik untuk memilih satu gambar manga</p>
+                            <p class="text-xs text-[#8892b0]" id="uploadSubLabel">Mendukung JPG, PNG, WEBP</p>
+                            <input type="file" id="fileInput" class="hidden" accept="image/jpeg, image/png, image/webp" />
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Preview Area -->
+                <div id="previewContainer" class="hidden mb-6">
+                    <h3 class="text-sm text-[#8892b0] mb-3 font-semibold border-b border-[rgba(138,180,248,0.1)] pb-1 flex justify-between">
+                        <span>Preview Gambar ✿</span>
+                        <span id="previewCount" class="text-[#8ab4f8] text-xs"></span>
+                    </h3>
+                    <div id="previewGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-64 overflow-y-auto pr-2">
+                        <!-- Thumbnails akan dimuat di sini -->
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <button id="processBtn" class="w-full bg-[#8ab4f8] hover:bg-[#a9c2f0] text-[#0a192f] py-3 rounded-lg font-bold tracking-wide transition-all shadow-[0_0_20px_rgba(138,180,248,0.3)] disabled:opacity-50 disabled:cursor-not-allowed mb-6">
+                    <span id="btnText">Mulai Ekstrak Teks ⚡</span>
+                </button>
+
+                <div>
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="block text-sm text-[#8892b0] font-semibold border-b border-[rgba(138,180,248,0.1)] pb-1 w-full flex justify-between">
+                            <span>Hasil Ekstraksi ✿</span>
+                            <span id="statusText" class="text-[#8ab4f8] text-xs font-normal"></span>
+                        </label>
+                    </div>
+                    <div class="relative">
+                        <textarea id="resultText" readonly placeholder="Hasil teks akan muncul di sini ( ´ ▽ ` )" 
+                            class="cyber-input w-full h-64 md:h-80 p-4 rounded-lg text-sm leading-relaxed resize-y font-mono"></textarea>
+                        
+                        <div class="absolute bottom-4 right-4 flex gap-2">
+                            <button id="downloadBtn" class="bg-[#112240] hover:bg-[#233554] text-[#8ab4f8] px-4 py-2 rounded border border-[#8ab4f8]/30 text-xs font-semibold transition-all flex items-center gap-2 shadow-lg">
+                                <span>Download TXT ✧</span>
+                            </button>
+                            <button id="copyBtn" class="bg-[#112240] hover:bg-[#233554] text-[#8ab4f8] px-4 py-2 rounded border border-[#8ab4f8]/30 text-xs font-semibold transition-all flex items-center gap-2 shadow-lg">
+                                <span>Salin Teks</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Panduan Format Teks -->
+                    <div class="mt-4 p-4 rounded-lg bg-[rgba(2,12,27,0.5)] border border-[rgba(138,180,248,0.15)] text-[#8892b0] text-sm shadow-inner">
+                        <h4 class="font-semibold mb-3 text-[#e6f1ff] border-b border-[#233554] pb-1">Panduan Format Teks ⚡</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs md:text-sm">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-[#112240] text-[#8ab4f8] px-2 py-1 rounded font-bold tracking-widest w-12 text-center">()</span>
+                                <span>: Bubble Bulat</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-[#112240] text-[#8ab4f8] px-2 py-1 rounded font-bold tracking-widest w-12 text-center">[]</span>
+                                <span>: Bubble Kotak</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-[#112240] text-[#8ab4f8] px-2 py-1 rounded font-bold tracking-widest w-12 text-center">"</span>
+                                <span>: Luar Bubble</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-[#112240] text-[#8ab4f8] px-2 py-1 rounded font-bold tracking-widest w-12 text-center">//</span>
+                                <span>: SFX</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </section>
+
+        <div id="alertModal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-[#050b14]/80 backdrop-blur-sm transition-opacity">
+            <div class="glass-panel p-6 rounded-xl max-w-sm w-[90%] text-center transform scale-95 transition-transform duration-300 border border-[#8ab4f8]/30" id="alertBox">
+                <h3 class="text-xl font-bold text-[#8ab4f8] mb-2 heading-font" id="alertTitle">Pesan</h3>
+                <p class="text-[#e6f1ff] text-sm mb-6" id="alertMessage">Pesan teks di sini.</p>
+                <button id="closeAlertBtn" class="bg-[#8ab4f8] hover:bg-[#a9c2f0] text-[#0a192f] px-6 py-2 rounded-lg text-sm font-bold w-full">
+                    Mengerti ✿
+                </button>
+            </div>
+        </div>
+
+        <div id="inputModal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-[#050b14]/80 backdrop-blur-sm transition-opacity">
+            <div class="glass-panel p-6 rounded-xl max-w-sm w-[90%] text-center transform scale-95 transition-transform duration-300 border border-[#8ab4f8]/30" id="inputBox">
+                <h3 class="text-xl font-bold text-[#8ab4f8] mb-2 heading-font">Simpan TXT ✿</h3>
+                <p class="text-[#e6f1ff] text-sm mb-4">Masukkan judul file untuk mengunduh hasil:</p>
+                <input type="text" id="filenameInput" placeholder="Contoh: Chapter_01" class="cyber-input w-full px-4 py-2 rounded-lg text-sm mb-6 text-center focus:ring-2 focus:ring-[#8ab4f8]/50">
+                <div class="flex gap-3">
+                    <button id="cancelInputBtn" class="flex-1 bg-[#112240] hover:bg-[#233554] border border-[#8ab4f8]/30 text-[#8ab4f8] px-4 py-2 rounded-lg text-sm font-bold transition-all">Batal ✕</button>
+                    <button id="confirmDownloadBtn" class="flex-1 bg-[#8ab4f8] hover:bg-[#a9c2f0] text-[#0a192f] px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-[0_0_15px_rgba(138,180,248,0.3)]">Unduh ⚡</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // State
+        let currentMode = 'single';
+        let uploadedFiles = [];
+        
+        // Element References
+        const providerSelect = document.getElementById('providerSelect');
+        const apiKeyLabel = document.getElementById('apiKeyLabel');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const toggleKeyBtn = document.getElementById('toggleKeyBtn');
+        const modelSelect = document.getElementById('modelSelect');
+        const filterMode = document.getElementById('filterMode');
+        const languageSelect = document.getElementById('languageSelect');
+        const saveKeyBtn = document.getElementById('saveKeyBtn');
+        
+        const tabSingle = document.getElementById('tabSingle');
+        const tabBulk = document.getElementById('tabBulk');
+        const tabZip = document.getElementById('tabZip');
+        
+        const fileInput = document.getElementById('fileInput');
+        const uploadLabel = document.getElementById('uploadLabel');
+        const uploadSubLabel = document.getElementById('uploadSubLabel');
+        const previewContainer = document.getElementById('previewContainer');
+        const previewGrid = document.getElementById('previewGrid');
+        const previewCount = document.getElementById('previewCount');
+        
+        const processBtn = document.getElementById('processBtn');
+        const btnText = document.getElementById('btnText');
+        const resultText = document.getElementById('resultText');
+        const copyBtn = document.getElementById('copyBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusText = document.getElementById('statusText');
+        
+        const alertModal = document.getElementById('alertModal');
+        const alertBox = document.getElementById('alertBox');
+        const alertTitle = document.getElementById('alertTitle');
+        const alertMessage = document.getElementById('alertMessage');
+        const closeAlertBtn = document.getElementById('closeAlertBtn');
+
+        const inputModal = document.getElementById('inputModal');
+        const inputBox = document.getElementById('inputBox');
+        const filenameInput = document.getElementById('filenameInput');
+        const cancelInputBtn = document.getElementById('cancelInputBtn');
+        const confirmDownloadBtn = document.getElementById('confirmDownloadBtn');
+
+        // Prompt Sistem AI
+        const SYSTEM_PROMPT = "Read manga text from right to left, top to bottom. Format output strictly using these exact prefixes followed by colon and space:\n" +
+            "() : for round speech bubbles\n" +
+            "[] : for square speech or thought bubbles\n" +
+            "\" : for narration or text completely outside any bubbles\n" +
+            "// : for SFX (sound effects) or very small text\n" +
+            "Example format:\n" +
+            "() : what are u doing?\n" +
+            "// : ugh\n" +
+            "\" : where?\n" +
+            "Do not add any conversational text, intro, or markdown formatting outside of these prefixes.";
+
+        function showMessage(title, message) {
+            alertTitle.innerText = title;
+            alertMessage.innerText = message;
+            alertModal.classList.remove('hidden');
+            setTimeout(() => alertBox.classList.remove('scale-95'), 10);
+        }
+
+        closeAlertBtn.addEventListener('click', () => {
+            alertBox.classList.add('scale-95');
+            setTimeout(() => alertModal.classList.add('hidden'), 200);
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedProvider = localStorage.getItem('hqruchyo_provider');
+            const savedKey = localStorage.getItem('hqruchyo_api_key');
+            const savedModel = localStorage.getItem('hqruchyo_model');
+            const savedFilter = localStorage.getItem('hqruchyo_filter');
+            const savedLang = localStorage.getItem('hqruchyo_language');
+            
+            if (savedProvider) {
+                providerSelect.value = savedProvider;
+                updateProviderUI();
+            }
+            if (savedKey) apiKeyInput.value = savedKey;
+            if (savedModel) modelSelect.value = savedModel;
+            if (savedFilter) filterMode.value = savedFilter;
+            if (savedLang) languageSelect.value = savedLang;
+        });
+
+        function updateProviderUI() {
+            if (providerSelect.value === 'sumopod') {
+                apiKeyLabel.innerText = 'Sumopod API Key ⚡';
+                apiKeyInput.placeholder = 'Masukkan API Key (sk-...)';
+            } else {
+                apiKeyLabel.innerText = 'Gemini API Key ⚡';
+                apiKeyInput.placeholder = 'Masukkan API Key (AIzaSy...)';
+            }
+        }
+
+        providerSelect.addEventListener('change', updateProviderUI);
+
+        toggleKeyBtn.addEventListener('click', () => {
+            if (apiKeyInput.type === 'password') {
+                apiKeyInput.type = 'text';
+                toggleKeyBtn.innerText = '[🙈]';
+            } else {
+                apiKeyInput.type = 'password';
+                toggleKeyBtn.innerText = '[👁]';
+            }
+        });
+
+        saveKeyBtn.addEventListener('click', () => {
+            const provider = providerSelect.value;
+            const key = apiKeyInput.value.trim();
+            const model = modelSelect.value;
+            const filter = filterMode.value;
+            const lang = languageSelect.value;
+            if (key) {
+                localStorage.setItem('hqruchyo_provider', provider);
+                localStorage.setItem('hqruchyo_api_key', key);
+                localStorage.setItem('hqruchyo_model', model);
+                localStorage.setItem('hqruchyo_filter', filter);
+                localStorage.setItem('hqruchyo_language', lang);
+                showMessage("Tersimpan ✿", "API Key dan Pengaturan telah disimpan.");
+            } else {
+                showMessage("Perhatian ( ＞＜)", "API Key tidak boleh kosong.");
+            }
+        });
+
+        function switchTab(mode) {
+            currentMode = mode;
+            uploadedFiles = [];
+            fileInput.value = '';
+            renderPreviews();
+            resultText.value = '';
+            statusText.innerText = '';
+            
+            // Reset classes
+            [tabSingle, tabBulk, tabZip].forEach(tab => {
+                tab.classList.remove('active', 'text-[#8ab4f8]');
+                tab.classList.add('text-[#8892b0]');
+            });
+
+            if (mode === 'single') {
+                tabSingle.classList.add('active', 'text-[#8ab4f8]');
+                tabSingle.classList.remove('text-[#8892b0]');
+                fileInput.removeAttribute('multiple');
+                fileInput.setAttribute('accept', 'image/jpeg, image/png, image/webp');
+                uploadLabel.innerText = 'Klik untuk memilih satu gambar manga';
+                uploadSubLabel.innerText = 'Mendukung JPG, PNG, WEBP';
+            } else if (mode === 'bulk') {
+                tabBulk.classList.add('active', 'text-[#8ab4f8]');
+                tabBulk.classList.remove('text-[#8892b0]');
+                fileInput.setAttribute('multiple', 'multiple');
+                fileInput.setAttribute('accept', 'image/jpeg, image/png, image/webp');
+                uploadLabel.innerText = 'Klik untuk memilih banyak gambar manga sekaligus';
+                uploadSubLabel.innerText = 'Mendukung JPG, PNG, WEBP';
+            } else if (mode === 'zip') {
+                tabZip.classList.add('active', 'text-[#8ab4f8]');
+                tabZip.classList.remove('text-[#8892b0]');
+                fileInput.removeAttribute('multiple');
+                fileInput.setAttribute('accept', '.zip');
+                uploadLabel.innerText = 'Klik untuk mengunggah satu file .ZIP';
+                uploadSubLabel.innerText = 'File zip harus berisi gambar manga';
+            }
+        }
+
+        tabSingle.addEventListener('click', () => switchTab('single'));
+        tabBulk.addEventListener('click', () => switchTab('bulk'));
+        tabZip.addEventListener('click', () => switchTab('zip'));
+
+        fileInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+
+            if (currentMode === 'single') {
+                uploadedFiles = [files[0]];
+                renderPreviews();
+            } else if (currentMode === 'bulk') {
+                const collator = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
+                uploadedFiles = files.sort((a, b) => collator.compare(a.name, b.name));
+                renderPreviews();
+            } else if (currentMode === 'zip') {
+                const file = files[0];
+                if (!file.name.toLowerCase().endsWith('.zip')) {
+                    showMessage("Format Salah", "Silakan unggah file berformat .zip ⚡");
+                    return;
+                }
+                
+                uploadLabel.innerText = "Mengekstrak ZIP... ⚡";
+                previewContainer.classList.add('hidden');
+                
+                try {
+                    const zip = new JSZip();
+                    const contents = await zip.loadAsync(file);
+                    let imageFiles = [];
+
+                    for (const filename of Object.keys(contents.files)) {
+                        const zipEntry = contents.files[filename];
+                        if (!zipEntry.dir && filename.match(/\.(jpg|jpeg|png|webp)$/i)) {
+                            const blob = await zipEntry.async("blob");
+                            const fileObj = new File([blob], filename.split('/').pop(), { type: blob.type || "image/jpeg" });
+                            imageFiles.push(fileObj);
+                        }
+                    }
+
+                    if (imageFiles.length === 0) {
+                        showMessage("Kosong", "Tidak ada gambar (JPG/PNG/WEBP) di dalam file ZIP tersebut.");
+                        uploadLabel.innerText = 'Klik untuk mengunggah file .ZIP manga';
+                        return;
+                    }
+
+                    const collator = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
+                    imageFiles.sort((a, b) => collator.compare(a.name, b.name));
+
+                    uploadedFiles = imageFiles;
+                    uploadLabel.innerText = `ZIP berhasil dimuat ✿`;
+                    uploadSubLabel.innerText = `${uploadedFiles.length} gambar siap diproses`;
+                    renderPreviews();
+
+                } catch (error) {
+                    console.error("ZIP Error:", error);
+                    showMessage("Gagal Ekstrak ZIP", "Terjadi kesalahan saat membaca file ZIP. Pastikan file tidak rusak.");
+                    uploadLabel.innerText = 'Klik untuk mengunggah file .ZIP manga';
+                }
+            }
+        });
+
+        function renderPreviews() {
+            previewGrid.innerHTML = '';
+            if (uploadedFiles.length === 0) {
+                previewContainer.classList.add('hidden');
+                return;
+            }
+            previewContainer.classList.remove('hidden');
+            previewCount.innerText = `${uploadedFiles.length} Gambar`;
+
+            uploadedFiles.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const div = document.createElement('div');
+                    div.className = 'relative aspect-[3/4] rounded border border-[#8ab4f8]/30 overflow-hidden bg-black/50';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" class="w-full h-full object-cover opacity-70" alt="Page ${index+1}">
+                        <div class="absolute bottom-0 left-0 w-full bg-[#050b14]/80 text-[10px] text-[#8ab4f8] p-1 text-center truncate backdrop-blur-sm">
+                            ${currentMode !== 'single' ? 'Page ' + (index + 1) : file.name}
+                        </div>
+                    `;
+                    previewGrid.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function fileToBase64Data(file) {
+            return new Promise((resolve, reject) => {
+                if (!file || !(file instanceof Blob)) {
+                    reject(new Error("File tidak valid."));
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Maksimal dimensi diset ke 4096 (Sangat HD). Menjaga teks tetap tajam tapi mencegah error payload besar.
+                        const MAX_DIM = 4096; 
+                        let width = img.width;
+                        let height = img.height;
+                        
+                        if (width > MAX_DIM || height > MAX_DIM) {
+                            if (width > height) {
+                                height = Math.round(height * (MAX_DIM / width));
+                                width = MAX_DIM;
+                            } else {
+                                width = Math.round(width * (MAX_DIM / height));
+                                height = MAX_DIM;
+                            }
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        const mimeType = file.type || 'image/jpeg';
+                        const dataUrl = canvas.toDataURL(mimeType, 0.95); 
+                        const base64Data = dataUrl.split(',')[1];
+                        
+                        resolve({
+                            mimeType: mimeType,
+                            data: base64Data
+                        });
+                    };
+                    img.onerror = () => {
+                        reject(new Error("Gagal memproses resolusi gambar."));
+                    };
+                    img.src = event.target.result;
+                };
+                reader.onerror = () => reject(new Error("Gagal membaca file lokal."));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function callGemini(base64ImageObj, apiKey) {
+            const selectedProvider = providerSelect.value || 'gemini';
+            const selectedModel = modelSelect.value || 'gemini-2.5-flash';
+            const selectedFilter = filterMode.value || 'normal';
+            const selectedLang = languageSelect.value || 'original';
+            
+            let finalPrompt = SYSTEM_PROMPT;
+            if (selectedLang === 'english') {
+                finalPrompt += "\n\nCRITICAL INSTRUCTION: Translate all the extracted text into English before formatting. Output ONLY the English translation.";
+            } else if (selectedLang === 'indo') {
+                finalPrompt += "\n\nCRITICAL INSTRUCTION: Translate all the extracted text into formal Indonesian (Bahasa Indonesia baku). IMPORTANT: ALWAYS use 'aku' for first-person pronouns and 'kau' for second-person pronouns. Output ONLY the Indonesian translation.";
+            } else {
+                finalPrompt += "\n\nCRITICAL INSTRUCTION: Extract and output the text in its original language exactly as it appears in the image.";
+            }
+
+            let url, payload, headers;
+
+            if (selectedProvider === 'gemini') {
+                url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+                headers = { 'Content-Type': 'application/json' };
+                payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: finalPrompt },
+                            {
+                                inline_data: {
+                                    mime_type: base64ImageObj.mimeType,
+                                    data: base64ImageObj.data
+                                }
+                            }
+                        ]
+                    }],
+                    generationConfig: {
+                        temperature: 0.1,
+                    }
+                };
+
+                if (selectedFilter === 'dewasa') {
+                    payload.safetySettings = [
+                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                    ];
+                }
+            } else if (selectedProvider === 'sumopod') {
+                // Konfigurasi Payload Khusus Untuk Sumopod (OpenAI Compatible Format)
+                url = `https://ai.sumopod.com/v1/chat/completions`;
+                headers = { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                };
+                payload = {
+                    model: selectedModel,
+                    messages: [{
+                        role: "user",
+                        content: [
+                            { type: "text", text: finalPrompt },
+                            { type: "image_url", image_url: { url: `data:${base64ImageObj.mimeType};base64,${base64ImageObj.data}` } }
+                        ]
+                    }],
+                    temperature: 0.1,
+                    max_tokens: 4000
+                };
+            }
+
+            let response;
+            try {
+                response = await fetch(url, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
+            } catch (netErr) {
+                throw new Error("Koneksi jaringan gagal. Cek koneksi internetmu.");
+            }
+
+            if (!response.ok) {
+                let errorMsg = `Gagal dari server ${selectedProvider === 'gemini' ? 'Gemini' : 'Sumopod'} (${response.status})`;
+                try {
+                    const errData = await response.json();
+                    if (errData.error?.message) {
+                        errorMsg = errData.error.message;
+                    }
+                } catch (e) {}
+                
+                // Jika limit Gemini tercapai, berikan instruksi ramah untuk switch ke Sumopod
+                if (response.status === 429 && selectedProvider === 'gemini') {
+                    errorMsg += " (Limit Free Tier Gemini tercapai! Silakan ubah Penyedia API ke 'Sumopod API' dan masukkan API Key Sumopod kamu di atas ⚡)";
+                }
+                
+                throw new Error(errorMsg);
+            }
+
+            const data = await response.json();
+            let textResult = "";
+
+            if (selectedProvider === 'gemini') {
+                textResult = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            } else if (selectedProvider === 'sumopod') {
+                textResult = data?.choices?.[0]?.message?.content || "";
+            }
+
+            return textResult.trim();
+        }
+
+        processBtn.addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+            
+            if (!apiKey) {
+                showMessage("Gagal", "Harap masukkan API Key terlebih dahulu ⚡");
+                return;
+            }
+            if (uploadedFiles.length === 0) {
+                showMessage("Kosong", "Silakan upload gambar / zip manga terlebih dahulu ✿");
+                return;
+            }
+
+            processBtn.disabled = true;
+            processBtn.innerHTML = '<div class="loader"></div> <span id="btnText">Mengekstrak... ⚡</span>';
+            resultText.value = '';
+            
+            try {
+                if (currentMode === 'single') {
+                    statusText.innerText = 'Memproses 1 gambar... ⚡';
+                    const imageObj = await fileToBase64Data(uploadedFiles[0]);
+                    const extractedText = await callGemini(imageObj, apiKey);
+                    resultText.value = extractedText;
+                } 
+                else if (currentMode === 'bulk' || currentMode === 'zip') {
+                    let finalBulkResult = "";
+                    for (let i = 0; i < uploadedFiles.length; i++) {
+                        statusText.innerText = `Memproses Page ${i + 1} dari ${uploadedFiles.length} ✿`;
+                        
+                        const imageObj = await fileToBase64Data(uploadedFiles[i]);
+                        const extractedText = await callGemini(imageObj, apiKey);
+                        
+                        finalBulkResult += `Page ${i + 1}.\n${extractedText}\n\n`;
+                        
+                        resultText.value = finalBulkResult;
+                        resultText.scrollTop = resultText.scrollHeight;
+
+                        // Jeda waktu 500ms agar proses ngebut namun aman dari rate limit
+                        if (i < uploadedFiles.length - 1) {
+                            await new Promise(res => setTimeout(res, 500));
+                        }
+                    }
+                }
+                statusText.innerText = 'Selesai ( ´ ▽ ` )';
+            } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                console.error("OCR Error:", errorMsg);
+                statusText.innerText = 'Terjadi Kesalahan ✕';
+                showMessage("Gagal Ekstraksi", errorMsg);
+            } finally {
+                processBtn.disabled = false;
+                processBtn.innerHTML = '<span id="btnText">Mulai Ekstrak Teks ⚡</span>';
+            }
+        });
+
+        copyBtn.addEventListener('click', () => {
+            if (!resultText.value.trim()) return;
+
+            resultText.select();
+            resultText.setSelectionRange(0, 99999);
+
+            try {
+                document.execCommand('copy');
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<span>Disalin! ✿</span>';
+                copyBtn.classList.replace('bg-[#112240]', 'bg-[rgba(138,180,248,0.2)]'); 
+                copyBtn.classList.replace('text-[#8ab4f8]', 'text-white');
+                
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                    copyBtn.classList.replace('bg-[rgba(138,180,248,0.2)]', 'bg-[#112240]');
+                    copyBtn.classList.replace('text-white', 'text-[#8ab4f8]');
+                }, 2000);
+            } catch (err) {
+                showMessage("Gagal", "Browser tidak mendukung auto-copy ⚡");
+            }
+        });
+
+        function hideInputModal() {
+            inputBox.classList.add('scale-95');
+            setTimeout(() => inputModal.classList.add('hidden'), 200);
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            if (!resultText.value.trim()) {
+                showMessage("Kosong ( ＞＜)", "Tidak ada teks yang bisa diunduh.");
+                return;
+            }
+            filenameInput.value = '';
+            inputModal.classList.remove('hidden');
+            setTimeout(() => inputBox.classList.remove('scale-95'), 10);
+            filenameInput.focus();
+        });
+
+        cancelInputBtn.addEventListener('click', hideInputModal);
+
+        confirmDownloadBtn.addEventListener('click', () => {
+            let filename = filenameInput.value.trim();
+            if (!filename) {
+                filename = "HQRUCHYO_OCR_Result";
+            }
+            if (!filename.toLowerCase().endsWith('.txt')) {
+                filename += ".txt";
+            }
+
+            const blob = new Blob([resultText.value], { type: "text/plain;charset=utf-8" });
+            
+            if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+                window.navigator.msSaveOrOpenBlob(blob, filename);
+            } else {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            }
+
+            hideInputModal();
+            showMessage("Berhasil ✿", `File ${filename} berhasil diunduh!`);
+        });
+
+    </script>
+</body>
+</html>
